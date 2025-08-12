@@ -1,0 +1,256 @@
+name: 🚀 Classic Isekai 웹소설 개선
+
+on:
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: '미션 (예: 1~3화 반복 개선)'
+        required: true
+        default: '1~3화 반복 개선'
+      
+      target_score:
+        description: '목표 점수'
+        required: false
+        default: '8.5'
+      
+      create_pr:
+        description: 'Pull Request 생성 여부'
+        required: true
+        type: choice
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'
+  
+  # Classic Isekai 저장소의 Issue 트리거
+  repository_dispatch:
+    types: [improve-episode]
+  
+  schedule:
+    - cron: '0 0 * * 0'  # 매주 일요일 자정
+
+jobs:
+  improve-classic-isekai:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    
+    steps:
+    - name: Checkout AI Workflow
+      uses: actions/checkout@v3
+      with:
+        path: ai-workflow
+    
+    - name: Checkout Classic Isekai
+      uses: actions/checkout@v3
+      with:
+        repository: garimto81/classic-isekai
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: classic-isekai
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r ai-workflow/src/workflow/requirements.txt
+    
+    - name: Parse mission and validate episodes
+      id: parse-and-validate
+      run: |
+        cat > validate_and_parse.py << 'EOF'
+        import sys
+        import json
+        import asyncio
+        sys.path.append('ai-workflow/src/workflow')
+        
+        from text_mission_parser import MissionExecutor
+        from repository_connector import ClassicIsekaiConnector, EpisodeValidator
+        
+        async def validate_and_parse():
+            # 미션 파싱
+            mission_text = """${{ github.event.inputs.mission }}"""
+            executor = MissionExecutor()
+            config = executor.execute_text_mission(mission_text)
+            
+            print("📝 미션 파싱 완료:")
+            print(f"   대상: {config['target_episodes']}화")
+            print(f"   액션: {config['action']}")
+            
+            # Classic Isekai 저장소 연결
+            connector = ClassicIsekaiConnector()
+            
+            # 에피소드 검증
+            validator = EpisodeValidator(connector)
+            validation_results = []
+            
+            for episode_num in config['target_episodes']:
+                print(f"\n🔍 {episode_num}화 검증 중...")
+                result = await validator.validate_episode(episode_num)
+                validation_results.append(result)
+                
+                if result['valid']:
+                    print(f"   ✅ 유효함")
+                else:
+                    print(f"   ❌ 문제 발견: {result}")
+            
+            # 프로젝트 문서 로드
+            print("\n📚 프로젝트 문서 로드 중...")
+            docs = await connector.fetch_project_documents()
+            print(f"   {len(docs)}개 문서 로드 완료")
+            
+            # 결과 저장
+            with open('mission_config.json', 'w') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            
+            with open('validation_results.json', 'w') as f:
+                json.dump(validation_results, f, indent=2, ensure_ascii=False)
+            
+            # GitHub Actions 출력
+            episodes = ','.join(map(str, config['target_episodes']))
+            print(f"::set-output name=episodes::{episodes}")
+            print(f"::set-output name=max_cycles::{config.get('max_cycles', 10)}")
+            
+            return config, validation_results
+        
+        asyncio.run(validate_and_parse())
+        EOF
+        
+        python validate_and_parse.py
+    
+    - name: Execute improvement
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        cat > improve_episodes.py << 'EOF'
+        import sys
+        import json
+        import asyncio
+        from pathlib import Path
+        sys.path.append('ai-workflow/src/workflow')
+        
+        from new_agent_system import NewAgentSystem
+        from repository_connector import ClassicIsekaiConnector
+        
+        async def improve_episodes():
+            # 설정 로드
+            with open('mission_config.json', 'r') as f:
+                config = json.load(f)
+            
+            # Classic Isekai 연결
+            connector = ClassicIsekaiConnector()
+            
+            # 개선 시스템 초기화
+            system = NewAgentSystem()
+            # Classic Isekai 경로로 설정
+            system.project_path = Path('classic-isekai')
+            await system.initialize()
+            
+            # 각 에피소드 개선
+            results = {}
+            for episode_num in config['target_episodes']:
+                print(f"\n📖 {episode_num}화 개선 시작...")
+                
+                # 원본 내용 로드
+                original_content = await connector.fetch_episode_content(episode_num)
+                if not original_content:
+                    print(f"   ❌ {episode_num}화를 찾을 수 없음")
+                    continue
+                
+                # 개선 작업
+                task = {
+                    'type': 'improve_episode',
+                    'episode_number': episode_num,
+                    'target_score': float("${{ github.event.inputs.target_score }}"),
+                    'content': original_content,
+                    'priority_aspects': config.get('priority_aspects', [])
+                }
+                
+                result = await system.main_coordinator.coordinate_episode_improvement(task)
+                
+                # 개선된 내용 저장
+                if result.get('improved_content'):
+                    episode_path = Path(f'classic-isekai/webnovel_episodes/{episode_num:03d}_에피소드_{episode_num}화.md')
+                    with open(episode_path, 'w', encoding='utf-8') as f:
+                        f.write(result['improved_content'])
+                    print(f"   ✅ {episode_num}화 개선 완료")
+                
+                results[f'episode_{episode_num}'] = result
+            
+            # 결과 저장
+            with open('improvement_results.json', 'w') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            
+            return results
+        
+        asyncio.run(improve_episodes())
+        EOF
+        
+        python improve_episodes.py
+    
+    - name: Create Pull Request or Commit
+      run: |
+        cd classic-isekai
+        
+        # Git 설정
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 변경사항 확인
+        if git diff --quiet; then
+          echo "변경사항 없음"
+          exit 0
+        fi
+        
+        # PR 생성 여부에 따라 처리
+        if [ "${{ github.event.inputs.create_pr }}" = "true" ]; then
+          # 브랜치 생성
+          BRANCH_NAME="improve-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b $BRANCH_NAME
+          
+          # 커밋
+          git add webnovel_episodes/*.md
+          git commit -m "🤖 AI 개선: ${{ github.event.inputs.mission }}"
+          
+          # 푸시
+          git push origin $BRANCH_NAME
+          
+          # PR 생성
+          gh pr create \
+            --title "🤖 AI 개선: ${{ github.event.inputs.mission }}" \
+            --body "## 📝 개선 내용\n\n미션: ${{ github.event.inputs.mission }}\n목표 점수: ${{ github.event.inputs.target_score }}\n\n[상세 결과](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            --base master \
+            --head $BRANCH_NAME
+        else
+          # 직접 커밋
+          git add webnovel_episodes/*.md
+          git commit -m "🤖 AI 개선: ${{ github.event.inputs.mission }}"
+          git push
+        fi
+    
+    - name: Create summary
+      run: |
+        echo "## 🎯 Classic Isekai 개선 완료" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 미션" >> $GITHUB_STEP_SUMMARY
+        echo "${{ github.event.inputs.mission }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 결과" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f improvement_results.json ]; then
+          python -c "
+          import json
+          with open('improvement_results.json') as f:
+              data = json.load(f)
+              for ep, result in data.items():
+                  score = result.get('final_score', 0)
+                  improvements = len(result.get('improvements_made', []))
+                  print(f\"- {ep}: {score:.1f}점, {improvements}개 개선\")
+          " >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 저장소" >> $GITHUB_STEP_SUMMARY
+        echo "[Classic Isekai](https://github.com/garimto81/classic-isekai)" >> $GITHUB_STEP_SUMMARY
