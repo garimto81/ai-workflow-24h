@@ -1,0 +1,193 @@
+# Classic Isekai 프로젝트 전용 설정
+
+# 프로젝트 기본 정보
+project:
+  name: "Classic Isekai"
+  base_path: "C:/claude04/classic-isekai"
+  current_universe: "terra_antica"  # 또는 "soul_martial"
+  
+  universes:
+    terra_antica:
+      title: "Resonance Extinctus"
+      genre: "포스트 아포칼립스 판타지"
+      setting: "10만년 후 미래"
+      episodes_path: "webnovel_episodes"
+    
+    soul_martial:
+      title: "영혼의 강호"
+      genre: "무협 판타지"
+      setting: "영혼 에너지 체계"
+      episodes_path: "docs"
+
+# 에이전트별 필수 문서 할당
+agent_documents:
+  
+  # 1. 메인 오케스트레이터
+  main_orchestrator:
+    primary:
+      - "PROJECT_OVERVIEW.md"
+      - "WORLDBUILDING_RULES.md" 
+      - "CLAUDE.md"
+      - "webnovel_episodes/000_소설정보.md"
+    secondary:
+      - "world_setting/000_INDEX.md"
+      - "docs/episode_guide.md"
+  
+  # 2. PM 에이전트
+  pm_agent:
+    primary:
+      - "docs/webnovel_planning.md"
+      - "world_setting/110_story_bible.md"
+      - "world_setting/112_episode_planning.md"
+    monitoring:
+      - "webnovel_episodes/"  # 모든 에피소드 진행 상황
+  
+  # 3. 작가 에이전트
+  writer_agent:
+    primary:
+      - "webnovel_episodes/000_소설정보.md"  # 작문 가이드라인
+      - "docs/episode_guide.md"  # 에피소드 구조 가이드
+    reference:
+      - "world_setting/100_protagonist.md"
+      - "world_setting/101_main_characters.md"
+      - "world_setting/090_terminology.md"
+      - "world_setting/021_resonance_system.md"
+    style_guide:
+      - "webnovel_episodes/제1화_학살의_밤.md"  # 기존 스타일 참조
+      - "webnovel_episodes/제2화_절망의_서막.md"
+      - "webnovel_episodes/제3화_절망의_심연.md"
+
+  # 4. 세계관 담당 에이전트  
+  worldbuilding_agent:
+    core_system:
+      - "world_setting/010_overview.md"
+      - "world_setting/011_terra_antica_system.md"
+      - "world_setting/021_resonance_system.md"
+    geography:
+      - "world_setting/020_geography_climate.md"
+    culture:
+      - "world_setting/022_language_culture.md"
+      - "world_setting/023_government_society.md"
+      - "world_setting/024_races_species.md"
+      - "world_setting/025_professions_guilds.md"
+    history:
+      - "world_setting/055_civilization_cycles.md"
+      - "world_setting/065_ancient_ruins_secrets.md"
+    reference:
+      - "world_setting/090_terminology.md"
+      - "world_setting/111_worldbuilding_integration.md"
+
+  # 5. 역사 담당 에이전트
+  history_agent:
+    timeline:
+      - "world_setting/055_civilization_cycles.md"
+      - "world_history/"  # 모든 역사 문서
+    episodes:
+      - "webnovel_episodes/"  # 모든 에피소드 (시간순 추적)
+    references:
+      - "world_setting/110_story_bible.md"
+      - "world_setting/100_protagonist.md"  # 주인공 배경
+
+  # 6. 캐릭터 담당 에이전트
+  character_agent:
+    main_characters:
+      - "world_setting/100_protagonist.md"
+      - "world_setting/101_main_characters.md"
+      - "world_setting/104_alternate_protagonists.md"
+    supporting:
+      - "world_setting/102_faction_leaders.md"
+      - "world_setting/103_minor_characters.md"
+    development_tracking:
+      - "webnovel_episodes/"  # 캐릭터 성장 추적
+    reference:
+      - "world_setting/023_government_society.md"  # 사회적 배경
+      - "world_setting/025_professions_guilds.md"  # 직업/지위
+
+  # 7. 문법 담당 에이전트
+  grammar_agent:
+    style_reference:
+      - "webnovel_episodes/000_소설정보.md"  # 문체 가이드라인
+      - "docs/episode_guide.md"  # 작문 스타일
+    validation:
+      - "webnovel_episodes/"  # 모든 에피소드
+
+  # 8. AI 화법 감지 에이전트
+  ai_detection_agent:
+    guidelines:
+      - "webnovel_episodes/000_소설정보.md"  # AI 화법 방지 지침
+    examples:
+      - "webnovel_episodes/제1화_학살의_밤.md"  # 자연스러운 문체 예시
+      - "webnovel_episodes/제2화_절망의_서막.md"
+      - "webnovel_episodes/제3화_절망의_심연.md"
+
+  # 9. 독자 담당 에이전트들
+  reader_agents:
+    genre_context:
+      - "webnovel_episodes/000_소설정보.md"  # 장르 특성
+      - "PROJECT_OVERVIEW.md"  # 작품 컨셉
+    episodes:
+      - "webnovel_episodes/"  # 평가 대상
+
+  # 10. QA 담당 에이전트
+  qa_agent:
+    standards:
+      - "WORLDBUILDING_RULES.md"  # 품질 기준
+      - "webnovel_episodes/000_소설정보.md"  # 작품 기준
+    validation:
+      - "world_setting/"  # 모든 세계관 문서
+      - "webnovel_episodes/"  # 모든 에피소드
+    reference:
+      - "world_setting/000_INDEX.md"  # 문서 구조
+
+  # 11. 연관성 분석 에이전트
+  correlation_agent:
+    story_tracking:
+      - "world_setting/110_story_bible.md"
+      - "world_setting/112_episode_planning.md"
+    character_arcs:
+      - "world_setting/100_protagonist.md"
+      - "world_setting/101_main_characters.md"
+    plot_threads:
+      - "webnovel_episodes/"  # 모든 에피소드
+    consistency:
+      - "world_setting/"  # 모든 세계관 문서
+
+# 에피소드 처리 설정
+episode_processing:
+  source_directory: "webnovel_episodes"
+  pattern: "제*화_*.md"
+  exclude_files:
+    - "000_소설정보.md"
+  
+  # 현재 에피소드 상태
+  current_status:
+    completed: [1, 2, 3]  # 완료된 화
+    in_review: []         # 검토 중인 화
+    pending: []           # 대기 중인 화
+
+# 품질 기준
+quality_standards:
+  min_episode_length: 6000  # 최소 6000자
+  max_episode_length: 8000  # 최대 8000자
+  
+  required_checks:
+    - worldbuilding_consistency
+    - character_consistency
+    - timeline_consistency
+    - terminology_consistency
+    - writing_quality
+    - ai_pattern_detection
+
+# 메모리 관리
+memory_settings:
+  character_memory_file: "memory/character_states.json"
+  world_memory_file: "memory/world_state.json"
+  plot_memory_file: "memory/plot_threads.json"
+  episode_memory_file: "memory/episode_progress.json"
+
+# 백업 설정
+backup:
+  enabled: true
+  backup_directory: "backups"
+  backup_frequency: "daily"
+  keep_versions: 7

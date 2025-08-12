@@ -1,0 +1,144 @@
+# 웹소설 자동화 시스템 설정
+
+# Claude API 설정
+claude:
+  api_key: ${CLAUDE_API_KEY}  # 환경변수에서 읽기
+  model: "claude-3-opus-20240229"  # 또는 claude-3-sonnet
+  max_tokens: 4000
+  temperature: 0.8
+  
+  # API 한도 관리
+  limits:
+    daily_tokens: 1000000  # 일일 토큰 한도
+    requests_per_minute: 50  # 분당 요청 한도
+    retry_delay: 300  # 한도 도달시 대기 시간(초)
+    
+# 에이전트 설정
+agents:
+  main:
+    name: "메인 오케스트레이터"
+    priority: 10
+    timeout: 60
+    
+  pm:
+    name: "PM 에이전트"
+    check_interval: 30  # 30초마다 상태 체크
+    
+  writer:
+    name: "작가 에이전트"
+    episode_length: 3000  # 에피소드 길이(자)
+    style: "한국 웹소설"
+    
+  worldbuilding:
+    name: "세계관 담당"
+    memory_file: "memory/worldbuilding.json"
+    
+  history:
+    name: "역사 담당"
+    memory_file: "memory/history.json"
+    
+  grammar:
+    name: "문법 담당"
+    check_items:
+      - "맞춤법"
+      - "띄어쓰기"
+      - "문장 자연스러움"
+      - "가독성"
+      
+  ai_detection:
+    name: "AI 화법 감지"
+    patterns:
+      - "짧은 문장 나열"
+      - "과도한 부사"
+      - "반복적 구조"
+      
+  readers:
+    count: 5  # 독자 에이전트 수
+    personas:
+      - age: "10대"
+        preference: "액션"
+      - age: "20대"
+        preference: "로맨스"
+      - age: "30대"
+        preference: "성장물"
+      - age: "20대"
+        preference: "판타지"
+      - age: "40대"
+        preference: "회귀물"
+        
+  qa:
+    name: "QA 담당"
+    min_score: 7.0  # 최소 통과 점수
+    
+# 파일 시스템 설정
+filesystem:
+  watch_directory: "documents/drafts"
+  output_directory: "documents/episodes"
+  check_interval: 1  # 파일 체크 간격(초)
+  
+  directories:
+    worldbuilding: "documents/worldbuilding"
+    history: "documents/history"
+    episodes: "documents/episodes"
+    drafts: "documents/drafts"
+    reviews: "documents/reviews"
+    
+# 워크플로우 설정
+workflow:
+  mode: "file_watch"  # 또는 "agent_chain"
+  
+  pipeline:
+    - "writer"
+    - "worldbuilding"
+    - "history"
+    - "history_improver"
+    - "grammar"
+    - "ai_detection"
+    - "readers"
+    - "qa"
+    
+  schedule:
+    daily_episodes: 3
+    generation_times:
+      - "02:00"
+      - "10:00"
+      - "18:00"
+    publish_times:
+      - "08:00"
+      - "14:00"
+      - "20:00"
+      
+# 웹소설 설정
+novel:
+  title: "회귀한 SSS급 헌터"
+  genre: "판타지"
+  tags:
+    - "회귀"
+    - "시스템"
+    - "레벨업"
+    - "먼치킨"
+  
+  settings:
+    world_name: "아르카디아"
+    time_period: "현대 + 던전"
+    main_character: "김현우"
+    
+# 로깅 설정
+logging:
+  level: "INFO"
+  file: "logs/webnovel.log"
+  max_size: "10MB"
+  backup_count: 5
+  
+  api_usage_log: "logs/api_usage.log"
+  agent_logs_dir: "logs/agents/"
+  
+# 모니터링 설정
+monitoring:
+  enabled: true
+  port: 9090
+  metrics:
+    - "api_calls"
+    - "tokens_used"
+    - "episodes_generated"
+    - "agent_performance"

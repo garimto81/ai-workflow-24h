@@ -1,0 +1,39 @@
+# Core Dependencies
+anthropic==0.25.0  # Claude API
+asyncio==3.4.3
+aiofiles==23.2.1
+watchdog==4.0.0  # File monitoring
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Data Processing
+pydantic==2.5.0
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# File Handling
+python-multipart==0.0.6
+jinja2==3.1.2
+
+# Async & Queue
+celery==5.3.4
+redis==5.0.1
+asyncio-mqtt==0.16.2
+
+# Monitoring & Logging
+loguru==0.7.2
+prometheus-client==0.19.0
+rich==13.7.0  # Beautiful terminal output
+
+# Utilities
+schedule==1.2.0
+tenacity==8.2.3  # Retry logic
+cachetools==5.3.2  # Caching
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+mypy==1.7.1
