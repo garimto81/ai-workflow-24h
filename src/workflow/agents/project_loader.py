@@ -286,5 +286,17 @@ class ProjectDocumentLoader:
             json.dump(state, f, ensure_ascii=False, indent=2)
 
 
-# 싱글톤 인스턴스
-project_loader = ProjectDocumentLoader()
+# 싱글톤 인스턴스 - 지연 초기화
+_project_loader = None
+
+def get_project_loader(config_path=None):
+    """프로젝트 로더 싱글톤 인스턴스를 반환 (지연 초기화)"""
+    global _project_loader
+    if _project_loader is None:
+        _project_loader = ProjectDocumentLoader(config_path)
+    return _project_loader
+
+# 하위 호환성을 위한 속성
+@property
+def project_loader():
+    return get_project_loader()

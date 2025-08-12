@@ -84,6 +84,12 @@ jobs:
         print(f"Python path added: {workflow_path}")
         print(f"Files in workflow dir: {os.listdir(workflow_path) if os.path.exists(workflow_path) else 'Not found'}")
         
+        # config 디렉토리 확인
+        config_path = os.path.join(workflow_path, 'config')
+        print(f"Config dir exists: {os.path.exists(config_path)}")
+        if os.path.exists(config_path):
+            print(f"Config files: {os.listdir(config_path)}")
+        
         try:
             from text_mission_parser import MissionExecutor
             from repository_connector import ClassicIsekaiConnector, EpisodeValidator

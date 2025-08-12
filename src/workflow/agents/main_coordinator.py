@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 from .base_agent import BaseAgent
-from .project_loader import project_loader
+from .project_loader import get_project_loader
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,8 @@ class MainCoordinatorAgent(BaseAgent):
         logger.info("메인 조율 에이전트 초기화 시작")
         
         # 프로젝트 로더 초기화
-        await project_loader.initialize_project()
+        loader = get_project_loader()
+        await loader.initialize_project()
         
         # 다른 에이전트들 초기화
         await self.initialize_sub_agents()
@@ -159,7 +160,8 @@ class MainCoordinatorAgent(BaseAgent):
         """에피소드 현재 상태 분석"""
         
         # 에피소드 내용 로드
-        episode_content = project_loader.get_episode_content(episode_num)
+        loader = get_project_loader()
+        episode_content = loader.get_episode_content(episode_num)
         if not episode_content:
             return {'error': f'에피소드 {episode_num}화를 찾을 수 없습니다'}
         
