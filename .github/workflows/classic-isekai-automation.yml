@@ -40,11 +40,11 @@ jobs:
       with:
         path: ai-workflow
     
-    - name: Checkout Classic Isekai
+    - name: Checkout Classic Isekai (Private Repo)
       uses: actions/checkout@v3
       with:
         repository: garimto81/classic-isekai
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.CLASSIC_ISEKAI_TOKEN || secrets.GITHUB_TOKEN }}
         path: classic-isekai
     
     - name: Set up Python

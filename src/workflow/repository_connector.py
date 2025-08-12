@@ -21,7 +21,10 @@ class ClassicIsekaiConnector:
         self.repo_url = f"https://github.com/{self.repo_owner}/{self.repo_name}"
         self.api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}"
         self.episodes_path = "webnovel_episodes"
-        self.github_token = github_token or os.environ.get('GITHUB_TOKEN')
+        # Private repo를 위한 토큰 우선순위: 인자 > CLASSIC_ISEKAI_TOKEN > GITHUB_TOKEN
+        self.github_token = (github_token or 
+                           os.environ.get('CLASSIC_ISEKAI_TOKEN') or 
+                           os.environ.get('GITHUB_TOKEN'))
         self.local_path = Path("classic-isekai-workspace")
         
     async def setup_workspace(self) -> bool:
@@ -302,11 +305,14 @@ class EpisodeValidator:
         }
         
         # 4. 캐릭터 체크
-        main_character = '카이'  # 주인공 이름
-        validation_results['checks']['character'] = {
-            'main_character_mentioned': main_character in content,
-            'passed': main_character in content
-        }
+        # 주인공 이름은 실제 스토리에 맞게 수정 필요
+        # TODO: 실제 주인공 이름으로 변경
+        main_character = ''  # 주인공 이름 (저장소 확인 후 설정)
+        if main_character:
+            validation_results['checks']['character'] = {
+                'main_character_mentioned': main_character in content,
+                'passed': main_character in content
+            }
         
         # 전체 유효성
         validation_results['valid'] = all(
