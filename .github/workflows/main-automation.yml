@@ -1,0 +1,231 @@
+name: 🚀 웹소설 자동화 시스템
+
+on:
+  # 1. 수동 실행 - 모든 옵션 지원
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        type: choice
+        default: 'text'
+        options:
+          - text        # 텍스트 미션 (예: "1~3화 반복 개선")
+          - continuous  # 연속 실행 (목표 달성까지)
+          - single      # 단일 사이클
+          - preset      # 프리셋 미션
+      
+      mission:
+        description: '미션 입력 (text 모드) 또는 프리셋 선택'
+        required: false
+        default: '1~3화 반복 개선'
+      
+      episodes:
+        description: '에피소드 (single/continuous 모드용)'
+        required: false
+        default: '1,2,3'
+      
+      target_score:
+        description: '목표 점수'
+        required: false
+        default: '8.5'
+      
+      max_cycles:
+        description: '최대 사이클'
+        required: false
+        default: '10'
+  
+  # 2. 스케줄 실행 (자동)
+  schedule:
+    - cron: '0 */6 * * *'  # 6시간마다
+  
+  # 3. Issue 트리거
+  issues:
+    types: [opened, edited]
+  
+  # 4. Issue 댓글 트리거
+  issue_comment:
+    types: [created]
+  
+  # 5. 연속 실행 트리거
+  repository_dispatch:
+    types: [continue-automation]
+
+jobs:
+  # 자동 모니터링 (항상 실행)
+  monitor:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check automation health
+      run: |
+        echo "🔍 자동화 시스템 상태 체크"
+        if [ -f "cycle_state.json" ]; then
+          echo "최근 실행 확인"
+          # 6시간 이상 중단되었으면 재시작
+          # ... 모니터링 로직
+        fi
+  
+  # 메인 실행 Job
+  execute:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    timeout-minutes: 350
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/workflow/requirements.txt
+    
+    - name: Determine execution mode
+      id: determine-mode
+      run: |
+        # 실행 모드 결정
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          MODE="${{ github.event.inputs.mode }}"
+          MISSION="${{ github.event.inputs.mission }}"
+        elif [ "${{ github.event_name }}" = "issues" ]; then
+          MODE="text"
+          MISSION=$(echo "${{ github.event.issue.body }}" | head -n 1)
+        elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+          if [[ "${{ github.event.comment.body }}" == /mission* ]]; then
+            MODE="text"
+            MISSION=$(echo "${{ github.event.comment.body }}" | sed 's/^\/mission //')
+          fi
+        elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          MODE="continuous"
+        else
+          MODE="text"
+          MISSION="1~3화 반복 개선"
+        fi
+        
+        echo "mode=$MODE" >> $GITHUB_OUTPUT
+        echo "mission=$MISSION" >> $GITHUB_OUTPUT
+        
+        echo "📋 실행 모드: $MODE"
+        echo "📝 미션/설정: $MISSION"
+    
+    - name: Parse and execute mission
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        cat > unified_executor.py << 'EOF'
+        import sys
+        import json
+        import asyncio
+        sys.path.append('src/workflow')
+        
+        from new_agent_system import NewAgentSystem
+        from text_mission_parser import MissionExecutor
+        from mission_config import MissionManager, MissionLibrary
+        
+        mode = "${{ steps.determine-mode.outputs.mode }}"
+        mission_input = """${{ steps.determine-mode.outputs.mission }}"""
+        
+        async def run_unified_mission():
+            print(f"🚀 통합 실행 시스템")
+            print(f"   모드: {mode}")
+            print(f"   입력: {mission_input}")
+            
+            # 모드별 설정 파싱
+            if mode == "text":
+                # 텍스트 미션 파싱
+                executor = MissionExecutor()
+                config = executor.execute_text_mission(mission_input)
+                episodes = config['target_episodes']
+                target_score = config.get('success_criteria', {}).get('min_score', 8.0)
+                max_cycles = config.get('max_cycles', 10)
+                
+            elif mode == "preset":
+                # 프리셋 미션 로드
+                manager = MissionManager()
+                mission = manager.load_mission(mission_input)
+                episodes = mission.target_episodes
+                target_score = mission.success_criteria.get('min_score', 8.0)
+                max_cycles = mission.max_cycles
+                
+            elif mode in ["continuous", "single"]:
+                # 직접 설정
+                episodes = [int(x) for x in "${{ github.event.inputs.episodes }}".split(',')]
+                target_score = float("${{ github.event.inputs.target_score }}")
+                max_cycles = int("${{ github.event.inputs.max_cycles }}")
+                if mode == "single":
+                    max_cycles = 1
+            
+            else:
+                # 기본값
+                episodes = [1, 2, 3]
+                target_score = 8.0
+                max_cycles = 10
+            
+            # 시스템 실행
+            system = NewAgentSystem()
+            await system.initialize()
+            
+            # 미션 실행
+            for cycle in range(1, max_cycles + 1):
+                print(f"\n🔄 사이클 #{cycle}/{max_cycles}")
+                
+                all_success = True
+                for episode in episodes:
+                    task = {
+                        'type': 'improve_episode',
+                        'episode_number': episode,
+                        'target_score': target_score
+                    }
+                    
+                    result = await system.main_coordinator.coordinate_episode_improvement(task)
+                    
+                    if result.get('final_score', 0) < target_score:
+                        all_success = False
+                
+                if all_success:
+                    print(f"✅ 목표 달성!")
+                    break
+                
+                # 연속 모드이고 사이클이 끝났으면 다음 트리거
+                if mode == "continuous" and cycle == max_cycles:
+                    print("🔄 다음 사이클 트리거...")
+                    # repository_dispatch 이벤트 트리거
+            
+            return True
+        
+        asyncio.run(run_unified_mission())
+        EOF
+        
+        python unified_executor.py
+    
+    - name: Create summary
+      run: |
+        echo "## 🎯 실행 완료" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **모드**: ${{ steps.determine-mode.outputs.mode }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **미션**: ${{ steps.determine-mode.outputs.mission }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **시간**: $(date)" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Commit results
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --staged --quiet || git commit -m "Auto: ${{ steps.determine-mode.outputs.mode }} - ${{ steps.determine-mode.outputs.mission }}"
+        git push
+    
+    - name: Trigger next cycle (if continuous)
+      if: steps.determine-mode.outputs.mode == 'continuous'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        event-type: continue-automation
