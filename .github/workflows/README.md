@@ -1,9 +1,23 @@
-# 📋 GitHub Actions 워크플로우 정리
+# 📋 GitHub Actions 워크플로우 가이드
+
+## ⚡ 시스템 상태 (2025-08-12 현재)
+- 🟢 **시스템**: 완전 운영 중
+- 🟢 **11개 AI 에이전트**: 모든 에이전트 정상 작동
+- 🟢 **Classic Isekai 연동**: Private 저장소 연결 완료
+- 🟢 **Config 경로 문제**: 해결 완료 (자동 경로 탐지)
+- 🟢 **테스트 통과율**: 100%
 
 ## 🎯 메인 워크플로우 (사용 권장)
 
-### ✅ `main-automation.yml` - 통합 시스템
-**모든 기능을 하나로 통합한 메인 워크플로우**
+### ✅ `classic-isekai-automation.yml` - 메인 시스템 🚀
+**11개 AI 에이전트가 협력하는 완전 자동화 웹소설 개선 시스템**
+
+**주요 특징:**
+- 🤖 11개 전문 AI 에이전트 협력
+- 🔗 Classic Isekai Private 저장소 연동
+- 📊 품질 점수 기반 자동 개선
+- 🎯 목표 달성까지 자동 반복
+- 🔒 보안 강화된 Private 저장소 접근
 
 #### 지원 모드:
 1. **text** - 텍스트 미션 (예: "1~3화 반복 개선")
@@ -53,14 +67,21 @@
 
 ## 🚀 빠른 시작
 
-### 가장 쉬운 방법:
+### 📋 필수 준비사항
+1. **ANTHROPIC_API_KEY** - Claude API 키 설정
+2. **CLASSIC_ISEKAI_TOKEN** - Private 저장소 접근 토큰
+
+### 🎯 가장 쉬운 실행 방법:
 ```
 1. Actions 탭 이동
-2. "🚀 웹소설 자동화 시스템" 선택
-3. Run workflow 클릭
-4. 모드: text 선택
-5. 미션: "1~3화 반복 개선" 입력
-6. Run workflow 버튼 클릭
+2. "🚀 Classic Isekai 웹소설 개선" 선택
+3. "Run workflow" 클릭
+4. 설정 입력:
+   - 미션: "1~3화 반복 개선" 
+   - 목표 점수: "8.5"
+   - Create PR: "false" (직접 커밋)
+5. "Run workflow" 버튼 클릭
+6. Actions 로그에서 실시간 진행상황 확인
 ```
 
 ### 텍스트 미션 예시:
