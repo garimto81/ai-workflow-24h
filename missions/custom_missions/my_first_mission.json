@@ -1,0 +1,23 @@
+{
+  "name": "첫 번째 커스텀 미션 예제",
+  "type": "custom",
+  "description": "사용자가 직접 만드는 미션 예제 - 1화를 8.5점까지 개선하면서 액션과 캐릭터에 집중",
+  "target_episodes": [1],
+  "success_criteria": {
+    "min_score": 8.5,
+    "action_reader_score": 8.0,
+    "character_score": 8.0,
+    "improvements_made": 10
+  },
+  "priority_aspects": [
+    "action",
+    "character",
+    "dialogue"
+  ],
+  "max_cycles": 7,
+  "settings": {
+    "parallel_agents": true,
+    "save_every_cycle": true,
+    "detailed_logging": true
+  }
+}

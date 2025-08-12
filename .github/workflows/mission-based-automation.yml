@@ -1,0 +1,172 @@
+name: Mission-Based Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: 'Mission to execute'
+        required: true
+        type: choice
+        options:
+          - beginner_polish
+          - action_intensify
+          - worldbuilding_deep
+          - character_focus
+          - reader_all_satisfy
+          - publication_ready
+          - genre_perfect
+          - speed_run
+          - episode_perfect
+          - experimental
+          - custom
+      custom_mission_json:
+        description: 'Custom mission JSON (if mission=custom)'
+        required: false
+        default: '{}'
+
+jobs:
+  execute-mission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/workflow/requirements.txt
+    
+    - name: Setup mission
+      id: setup-mission
+      run: |
+        cat > setup_mission.py << 'EOF'
+        import json
+        import sys
+        sys.path.append('src/workflow')
+        from mission_config import MissionManager, MissionLibrary
+        
+        mission_name = "${{ github.event.inputs.mission }}"
+        
+        if mission_name == "custom":
+            custom_json = '''${{ github.event.inputs.custom_mission_json }}'''
+            mission_data = json.loads(custom_json)
+            # Custom mission setup
+            print(f"Custom mission: {mission_data}")
+        else:
+            manager = MissionManager()
+            mission = manager.load_mission(mission_name)
+            manager.save_mission(mission)
+            
+            # Output mission details
+            print(f"Mission: {mission.name}")
+            print(f"Description: {mission.description}")
+            print(f"Episodes: {mission.target_episodes}")
+            print(f"Max cycles: {mission.max_cycles}")
+            
+            # Set outputs for GitHub Actions
+            with open('mission_outputs.txt', 'w') as f:
+                f.write(f"episodes={','.join(map(str, mission.target_episodes))}\n")
+                f.write(f"max_cycles={mission.max_cycles}\n")
+                f.write(f"mission_name={mission.name}\n")
+        EOF
+        
+        python setup_mission.py
+        
+        # Read outputs
+        if [ -f mission_outputs.txt ]; then
+          while IFS= read -r line; do
+            echo "$line" >> $GITHUB_OUTPUT
+          done < mission_outputs.txt
+        fi
+    
+    - name: Execute mission
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        cat > run_mission.py << 'EOF'
+        import sys
+        import asyncio
+        sys.path.append('src/workflow')
+        
+        from mission_config import MissionManager
+        from new_agent_system import NewAgentSystem
+        
+        async def run_mission():
+            manager = MissionManager()
+            mission = manager.load_mission()
+            
+            print(f"🎯 미션 실행: {mission.name}")
+            print(f"📝 {mission.description}")
+            
+            system = NewAgentSystem()
+            await system.initialize()
+            
+            # 미션 프롬프트 적용
+            mission_prompt = manager.get_mission_prompt(mission)
+            
+            # 미션 실행
+            for cycle in range(1, mission.max_cycles + 1):
+                print(f"\n🔄 사이클 #{cycle}/{mission.max_cycles}")
+                
+                results = {}
+                for episode in mission.target_episodes:
+                    task = {
+                        'type': 'improve_episode',
+                        'episode_number': episode,
+                        'mission_prompt': mission_prompt,
+                        'priority_aspects': mission.priority_aspects
+                    }
+                    
+                    result = await system.main_coordinator.coordinate_episode_improvement(task)
+                    results[f"episode_{episode}"] = result
+                
+                # 미션 완료 체크
+                if manager.check_mission_complete(results):
+                    print(f"🎉 미션 완료!")
+                    break
+                
+                # 진행 상황 리포트
+                print(manager.get_progress_report(results))
+            
+            return results
+        
+        asyncio.run(run_mission())
+        EOF
+        
+        python run_mission.py
+    
+    - name: Create mission report
+      run: |
+        echo "## 🎯 Mission Report: ${{ steps.setup-mission.outputs.mission_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Mission Details" >> $GITHUB_STEP_SUMMARY
+        echo "- Episodes: ${{ steps.setup-mission.outputs.episodes }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Max Cycles: ${{ steps.setup-mission.outputs.max_cycles }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f cycle_results.json ]; then
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json
+          with open('cycle_results.json') as f:
+              data = json.load(f)
+              print(f\"- Average Score: {data.get('average_score', 'N/A')}\")
+              print(f\"- Improvements: {data.get('improvements_made', 0)}\")
+          " >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Commit results
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --staged --quiet || git commit -m "Mission: ${{ steps.setup-mission.outputs.mission_name }} completed"
+        git push
