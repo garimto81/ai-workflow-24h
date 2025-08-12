@@ -1,0 +1,52 @@
+name: Monitor Automation Status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'  # 30분마다 체크
+
+jobs:
+  check-status:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check automation status
+      id: check
+      run: |
+        if [ -f "cycle_state.json" ]; then
+          LAST_RUN=$(python3 -c "import json; from datetime import datetime; data=json.load(open('cycle_state.json')); last=data.get('last_run', ''); print((datetime.utcnow() - datetime.fromisoformat(last.replace('Z', '+00:00'))).total_seconds() if last else 999999)")
+          CURRENT_CYCLE=$(python3 -c "import json; data=json.load(open('cycle_state.json')); print(data.get('current_cycle', 0))")
+          AVG_SCORE=$(python3 -c "import json; data=json.load(open('cycle_state.json')); print(data.get('average_score', 0))")
+          
+          echo "last_run_seconds=$LAST_RUN" >> $GITHUB_OUTPUT
+          echo "current_cycle=$CURRENT_CYCLE" >> $GITHUB_OUTPUT
+          echo "average_score=$AVG_SCORE" >> $GITHUB_OUTPUT
+          
+          # 6시간(21600초) 이상 실행되지 않았으면 중단된 것으로 판단
+          if (( $(echo "$LAST_RUN > 21600" | bc -l) )); then
+            echo "needs_restart=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_restart=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "needs_restart=true" >> $GITHUB_OUTPUT
+          echo "current_cycle=0" >> $GITHUB_OUTPUT
+          echo "average_score=0" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Restart if needed
+      if: steps.check.outputs.needs_restart == 'true'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        event-type: continue-automation
+        client-payload: '{"ref": "${{ github.ref }}"}'
+    
+    - name: Send notification
+      if: steps.check.outputs.needs_restart == 'true'
+      run: |
+        echo "⚠️ Automation was stopped. Restarting..." >> $GITHUB_STEP_SUMMARY
+        echo "- Last cycle: #${{ steps.check.outputs.current_cycle }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Last average score: ${{ steps.check.outputs.average_score }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,188 @@
+name: Webnovel Continuous Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      episodes:
+        description: 'Episodes to improve (e.g., 1,2,3)'
+        required: true
+        default: '1,2,3'
+      target_score:
+        description: 'Target score (e.g., 9.5)'
+        required: true
+        default: '9.0'
+      max_cycles:
+        description: 'Maximum cycles to run'
+        required: true
+        default: '10'
+  
+  repository_dispatch:
+    types: [continue-automation]
+
+jobs:
+  improve-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350  # 5시간 50분
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/workflow/requirements.txt
+        pip install PyGithub  # GitHub API 사용을 위해
+    
+    - name: Load cycle state
+      id: load-state
+      run: |
+        if [ -f "cycle_state.json" ]; then
+          echo "State file exists"
+          CURRENT_CYCLE=$(python -c "import json; data=json.load(open('cycle_state.json')); print(data.get('current_cycle', 1))")
+          EPISODES=$(python -c "import json; data=json.load(open('cycle_state.json')); print(data.get('episodes', '${{ github.event.inputs.episodes }}'))")
+          TARGET_SCORE=$(python -c "import json; data=json.load(open('cycle_state.json')); print(data.get('target_score', '${{ github.event.inputs.target_score }}'))")
+          MAX_CYCLES=$(python -c "import json; data=json.load(open('cycle_state.json')); print(data.get('max_cycles', '${{ github.event.inputs.max_cycles }}'))")
+          LAST_SCORES=$(python -c "import json; data=json.load(open('cycle_state.json')); print(json.dumps(data.get('last_scores', {})))")
+        else
+          echo "State file does not exist, initializing"
+          CURRENT_CYCLE=1
+          EPISODES="${{ github.event.inputs.episodes || '1,2,3' }}"
+          TARGET_SCORE="${{ github.event.inputs.target_score || '9.0' }}"
+          MAX_CYCLES="${{ github.event.inputs.max_cycles || '10' }}"
+          LAST_SCORES="{}"
+        fi
+        
+        echo "current_cycle=$CURRENT_CYCLE" >> $GITHUB_OUTPUT
+        echo "episodes=$EPISODES" >> $GITHUB_OUTPUT
+        echo "target_score=$TARGET_SCORE" >> $GITHUB_OUTPUT
+        echo "max_cycles=$MAX_CYCLES" >> $GITHUB_OUTPUT
+        echo "last_scores=$LAST_SCORES" >> $GITHUB_OUTPUT
+    
+    - name: Run improvement cycle
+      id: run-cycle
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        echo "🔄 Starting Cycle #${{ steps.load-state.outputs.current_cycle }}"
+        
+        # 단일 사이클 실행 스크립트 생성
+        cat > run_single_cycle.py << 'EOF'
+        import sys
+        import json
+        import asyncio
+        import os
+        sys.path.append('src/workflow')
+        
+        from new_agent_system import NewAgentSystem
+        
+        async def run_single_cycle():
+            episodes = sys.argv[1].split(',')
+            target_score = float(sys.argv[2])
+            
+            system = NewAgentSystem()
+            await system.initialize()
+            
+            # 한 사이클만 실행
+            results = {}
+            for episode in episodes:
+                result = await system.main_coordinator.coordinate_episode_improvement({
+                    'type': 'improve_episode',
+                    'episode_number': int(episode),
+                    'target_score': target_score
+                })
+                results[episode] = result.get('final_score', 0)
+            
+            # 결과 저장
+            with open('cycle_results.json', 'w') as f:
+                json.dump({
+                    'scores': results,
+                    'all_reached_target': all(score >= target_score for score in results.values()),
+                    'average_score': sum(results.values()) / len(results) if results else 0
+                }, f)
+            
+            return results
+        
+        if __name__ == "__main__":
+            asyncio.run(run_single_cycle())
+        EOF
+        
+        python run_single_cycle.py "${{ steps.load-state.outputs.episodes }}" "${{ steps.load-state.outputs.target_score }}"
+        
+        # 결과 읽기
+        CYCLE_COMPLETE=$(python -c "import json; data=json.load(open('cycle_results.json')); print(data.get('all_reached_target', False))")
+        AVG_SCORE=$(python -c "import json; data=json.load(open('cycle_results.json')); print(data.get('average_score', 0))")
+        NEW_SCORES=$(python -c "import json; data=json.load(open('cycle_results.json')); print(json.dumps(data.get('scores', {})))")
+        
+        echo "cycle_complete=$CYCLE_COMPLETE" >> $GITHUB_OUTPUT
+        echo "average_score=$AVG_SCORE" >> $GITHUB_OUTPUT
+        echo "new_scores=$NEW_SCORES" >> $GITHUB_OUTPUT
+    
+    - name: Update cycle state
+      id: update-state
+      run: |
+        NEXT_CYCLE=$(($${{ steps.load-state.outputs.current_cycle }} + 1))
+        
+        # 상태 파일 업데이트
+        cat > cycle_state.json << EOF
+        {
+          "current_cycle": $NEXT_CYCLE,
+          "episodes": "${{ steps.load-state.outputs.episodes }}",
+          "target_score": "${{ steps.load-state.outputs.target_score }}",
+          "max_cycles": "${{ steps.load-state.outputs.max_cycles }}",
+          "last_scores": ${{ steps.run-cycle.outputs.new_scores }},
+          "last_run": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "average_score": ${{ steps.run-cycle.outputs.average_score }}
+        }
+        EOF
+        
+        # 계속 실행 여부 결정
+        if [ "${{ steps.run-cycle.outputs.cycle_complete }}" = "True" ]; then
+          echo "✅ Target score reached! Stopping automation."
+          echo "should_continue=false" >> $GITHUB_OUTPUT
+        elif [ $NEXT_CYCLE -gt ${{ steps.load-state.outputs.max_cycles }} ]; then
+          echo "⚠️ Maximum cycles reached. Stopping automation."
+          echo "should_continue=false" >> $GITHUB_OUTPUT
+        else
+          echo "🔄 Continuing to cycle #$NEXT_CYCLE"
+          echo "should_continue=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit improvements and state
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 개선된 파일과 상태 파일 커밋
+        git add -A
+        git diff --staged --quiet || git commit -m "Auto: Cycle #${{ steps.load-state.outputs.current_cycle }} completed - Avg Score: ${{ steps.run-cycle.outputs.average_score }}"
+        git push
+    
+    - name: Trigger next cycle
+      if: steps.update-state.outputs.should_continue == 'true'
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        event-type: continue-automation
+        client-payload: '{"ref": "${{ github.ref }}"}'
+    
+    - name: Create summary
+      run: |
+        echo "## 🎯 Cycle #${{ steps.load-state.outputs.current_cycle }} Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Episodes**: ${{ steps.load-state.outputs.episodes }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Target Score**: ${{ steps.load-state.outputs.target_score }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Average Score**: ${{ steps.run-cycle.outputs.average_score }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Scores**: ${{ steps.run-cycle.outputs.new_scores }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.update-state.outputs.should_continue }}" = "true" ]; then
+          echo "🔄 **Next cycle will start automatically**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "✅ **Automation completed**" >> $GITHUB_STEP_SUMMARY
+        fi
