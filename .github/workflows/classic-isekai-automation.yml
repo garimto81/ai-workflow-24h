@@ -173,6 +173,13 @@ jobs:
             print(f"❌ Import 실패: {e}")
             sys.exit(1)
         
+        # 환경변수 확인
+        api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+        print(f"API 키 설정 상태: {'설정됨' if api_key else '없음'}")
+        if api_key:
+            print(f"API 키 길이: {len(api_key)}")
+            print(f"API 키 시작: {api_key[:10]}...")  # 처음 10자만 표시
+        
         async def improve_episodes():
             # 설정 로드
             with open('mission_config.json', 'r') as f:

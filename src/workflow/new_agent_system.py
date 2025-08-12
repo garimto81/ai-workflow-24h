@@ -50,8 +50,18 @@ class NewAgentSystem:
         
         # 메인 조율 에이전트 초기화
         logger.info("🎯 메인 조율 에이전트 초기화...")
-        self.main_coordinator = MainCoordinatorAgent()
-        await self.main_coordinator.initialize()
+        try:
+            self.main_coordinator = MainCoordinatorAgent()
+            await self.main_coordinator.initialize()
+            logger.info("✅ 메인 조율 에이전트 초기화 성공")
+        except Exception as e:
+            logger.error(f"❌ 메인 조율 에이전트 초기화 실패: {e}")
+            # API 키 없어도 계속 진행할 수 있도록 None으로 설정
+            if "API" in str(e) or "api_key" in str(e):
+                logger.warning("API 키 문제로 인한 초기화 실패 - 제한된 모드로 계속 진행")
+                self.main_coordinator = None
+            else:
+                raise e
         
         # 통계 초기화
         self.stats['start_time'] = datetime.now()

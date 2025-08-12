@@ -93,8 +93,24 @@ class BaseAgent(ABC):
     def initialize_api(self):
         """Claude API 초기화"""
         api_key = self.config['claude']['api_key']
+        
+        # 환경변수 형태인지 확인하고 실제 값으로 치환
+        if api_key and api_key.startswith('${') and api_key.endswith('}'):
+            env_var = api_key[2:-1]  # ${ANTHROPIC_API_KEY} → ANTHROPIC_API_KEY
+            api_key = os.environ.get(env_var, '')
+            logger.info(f"환경변수 {env_var}에서 API 키 로드")
+        
         if api_key:
-            self.api_client = Anthropic(api_key=api_key)
+            try:
+                # Anthropic 클라이언트 초기화 (간단한 방식)
+                self.api_client = Anthropic(api_key=api_key)
+                logger.info("Anthropic API 클라이언트 초기화 성공")
+            except Exception as e:
+                logger.error(f"Anthropic API 초기화 실패: {e}")
+                self.api_client = None
+        else:
+            logger.warning("API 키가 없어서 Anthropic 클라이언트를 초기화하지 못했습니다")
+            self.api_client = None
     
     @retry(
         stop=stop_after_attempt(3),

@@ -2,8 +2,8 @@
 
 # Claude API 설정
 claude:
-  api_key: ${CLAUDE_API_KEY}  # 환경변수에서 읽기
-  model: "claude-3-opus-20240229"  # 또는 claude-3-sonnet
+  api_key: ${ANTHROPIC_API_KEY}  # 환경변수에서 읽기
+  model: "claude-3-5-sonnet-20241022"  # 최신 모델
   max_tokens: 4000
   temperature: 0.8
   
