@@ -11,17 +11,18 @@ from pathlib import Path
 
 from agents.main_coordinator import MainCoordinatorAgent
 
-# logs 디렉토리 생성
-os.makedirs('logs', exist_ok=True)
+# 로깅 설정 - 환경에 따라 다르게 설정
+handlers = [logging.StreamHandler()]
 
-# 로깅 설정
+# GitHub Actions가 아닌 로컬 환경에서는 파일 로깅도 추가
+if not os.environ.get('GITHUB_ACTIONS'):
+    os.makedirs('logs', exist_ok=True)
+    handlers.append(logging.FileHandler('logs/new_agent_system.log', encoding='utf-8'))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/new_agent_system.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 
