@@ -5,6 +5,7 @@
 import asyncio
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -23,7 +24,7 @@ class BaseAgent(ABC):
     
     def __init__(self, name: str, config_path: str = "config/config.yaml"):
         self.name = name
-        self.config = self.load_config(config_path)
+        self.config = self.load_config(self._resolve_config_path(config_path))
         self.memory = {}
         self.message_queue = asyncio.Queue()
         self.status = "idle"
@@ -32,6 +33,57 @@ class BaseAgent(ABC):
         self.initialize_api()
         
         logger.info(f"{self.name} 에이전트 초기화 완료")
+    
+    def _resolve_config_path(self, config_path: str) -> str:
+        """설정 파일 경로를 동적으로 해결"""
+        import os
+        from pathlib import Path
+        
+        # 현재 파일의 위치를 기준으로 config 경로 계산
+        current_file = Path(__file__)
+        workflow_dir = current_file.parent.parent  # agents의 상위 디렉토리 (workflow)
+        
+        # 여러 가능한 경로 시도
+        possible_paths = [
+            workflow_dir / config_path,  # workflow/config/config.yaml
+            Path(config_path),  # 상대 경로 그대로
+            Path.cwd() / config_path,  # 현재 작업 디렉토리 기준
+            workflow_dir / "config" / "classic_isekai_project.yaml",  # Classic Isekai 전용 설정
+        ]
+        
+        for path in possible_paths:
+            if path.exists():
+                logger.info(f"Config 파일 발견: {path}")
+                return str(path)
+        
+        # 파일이 없으면 기본 config 생성
+        logger.warning(f"Config 파일을 찾을 수 없음. 기본 설정 사용")
+        return self._create_default_config()
+    
+    def _create_default_config(self) -> str:
+        """기본 설정 파일 생성"""
+        import tempfile
+        import yaml
+        
+        default_config = {
+            'claude': {
+                'api_key': os.environ.get('ANTHROPIC_API_KEY', ''),
+                'model': 'claude-3-5-sonnet-20241022',
+                'max_tokens': 4000,
+                'temperature': 0.7
+            },
+            'agents': {
+                'timeout': 120
+            }
+        }
+        
+        # 임시 파일로 저장
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
+        yaml.dump(default_config, temp_file, default_flow_style=False, allow_unicode=True)
+        temp_file.close()
+        
+        logger.info(f"기본 설정 파일 생성: {temp_file.name}")
+        return temp_file.name
     
     def load_config(self, config_path: str) -> Dict:
         """설정 파일 로드"""
