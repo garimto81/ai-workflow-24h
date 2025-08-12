@@ -40,12 +40,21 @@ jobs:
       with:
         path: ai-workflow
     
-    - name: Checkout Classic Isekai (Private Repo)
-      uses: actions/checkout@v3
-      with:
-        repository: garimto81/classic-isekai
-        token: ${{ secrets.CLASSIC_ISEKAI_TOKEN || secrets.GITHUB_TOKEN }}
-        path: classic-isekai
+    - name: Checkout Classic Isekai (Private Repo - webnovel_episodes only)
+      run: |
+        # 긴 파일명 문제를 피하기 위해 sparse-checkout 사용
+        git clone --filter=blob:none --no-checkout \
+          https://${{ secrets.CLASSIC_ISEKAI_TOKEN || secrets.GITHUB_TOKEN }}@github.com/garimto81/classic-isekai.git \
+          classic-isekai
+        cd classic-isekai
+        git sparse-checkout init --cone
+        git sparse-checkout set webnovel_episodes world_setting docs
+        git checkout
+        echo "✅ Classic Isekai 필수 폴더만 체크아웃 완료"
+        echo "📁 webnovel_episodes 폴더 내용:"
+        ls -la webnovel_episodes/ || echo "webnovel_episodes 폴더가 없습니다"
+        echo "📁 world_setting 폴더 내용:"
+        ls -la world_setting/ || echo "world_setting 폴더가 없습니다"
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -170,12 +179,24 @@ jobs:
                 
                 result = await system.main_coordinator.coordinate_episode_improvement(task)
                 
-                # 개선된 내용 저장
+                # 개선된 내용 저장 - 기존 파일명 찾기
                 if result.get('improved_content'):
-                    episode_path = Path(f'classic-isekai/webnovel_episodes/{episode_num:03d}_에피소드_{episode_num}화.md')
-                    with open(episode_path, 'w', encoding='utf-8') as f:
-                        f.write(result['improved_content'])
-                    print(f"   ✅ {episode_num}화 개선 완료")
+                    # webnovel_episodes 폴더에서 해당 화수 파일 찾기
+                    episodes_dir = Path('classic-isekai/webnovel_episodes')
+                    episode_file = None
+                    
+                    if episodes_dir.exists():
+                        for file in episodes_dir.glob('*.md'):
+                            if str(episode_num) in file.name and ('화' in file.name or 'episode' in file.name.lower()):
+                                episode_file = file
+                                break
+                    
+                    if episode_file:
+                        with open(episode_file, 'w', encoding='utf-8') as f:
+                            f.write(result['improved_content'])
+                        print(f"   ✅ {episode_num}화 개선 완료: {episode_file.name}")
+                    else:
+                        print(f"   ❌ {episode_num}화 파일을 찾을 수 없음")
                 
                 results[f'episode_{episode_num}'] = result
             

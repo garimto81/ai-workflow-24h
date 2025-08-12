@@ -199,25 +199,25 @@ class ClassicIsekaiConnector:
             return False
     
     def _extract_episode_number(self, filename: str) -> Optional[int]:
-        """파일명에서 에피소드 번호 추출"""
+        """파일명에서 에피소드 번호 추출 - webnovel_episodes 폴더용"""
         import re
         
-        # 패턴: 001_에피소드_1화 형식
-        match = re.search(r'(\d+)화', filename)
-        if match:
-            return int(match.group(1))
+        # webnovel_episodes 폴더의 실제 파일명 패턴들
+        patterns = [
+            r'(\d+)화',                    # "1화", "2화" 등
+            r'에피소드[_\s]*(\d+)',         # "에피소드_1", "에피소드 1" 등  
+            r'^(\d+)[_-]',                 # "001_", "1-" 등으로 시작
+            r'[Ee]pisode[_\s]*(\d+)',      # "Episode_1", "episode 1" 등
+            r'[Cc]hapter[_\s]*(\d+)',      # "Chapter_1", "chapter 1" 등
+            r'제(\d+)화',                  # "제1화", "제2화" 등
+        ]
         
-        # 패턴: 에피소드_01 형식
-        match = re.search(r'에피소드[_\s]*(\d+)', filename)
-        if match:
-            return int(match.group(1))
-        
-        # 패턴: 001_ 형식 (파일명 시작)
-        match = re.match(r'(\d{3})_', filename)
-        if match:
-            num = int(match.group(1))
-            if 1 <= num <= 100:  # 에피소드 번호 범위
-                return num
+        for pattern in patterns:
+            match = re.search(pattern, filename, re.IGNORECASE)
+            if match:
+                num = int(match.group(1))
+                if 1 <= num <= 100:  # 에피소드 번호 범위 제한
+                    return num
         
         return None
     
