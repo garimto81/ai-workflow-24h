@@ -64,7 +64,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r ai-workflow/src/workflow/requirements.txt
+        # 필수 패키지만 직접 설치
+        pip install anthropic aiohttp pydantic pyyaml python-dotenv aiofiles
+        # 전체 requirements.txt도 설치 시도
+        pip install -r ai-workflow/src/workflow/requirements.txt || echo "일부 패키지 설치 실패, 핵심 패키지는 설치됨"
     
     - name: Parse mission and validate episodes
       id: parse-and-validate
@@ -73,10 +76,21 @@ jobs:
         import sys
         import json
         import asyncio
-        sys.path.append('ai-workflow/src/workflow')
+        import os
         
-        from text_mission_parser import MissionExecutor
-        from repository_connector import ClassicIsekaiConnector, EpisodeValidator
+        # 경로 설정
+        workflow_path = os.path.join('ai-workflow', 'src', 'workflow')
+        sys.path.insert(0, workflow_path)
+        print(f"Python path added: {workflow_path}")
+        print(f"Files in workflow dir: {os.listdir(workflow_path) if os.path.exists(workflow_path) else 'Not found'}")
+        
+        try:
+            from text_mission_parser import MissionExecutor
+            from repository_connector import ClassicIsekaiConnector, EpisodeValidator
+            print("✅ 모듈 import 성공")
+        except ImportError as e:
+            print(f"❌ Import 실패: {e}")
+            sys.exit(1)
         
         async def validate_and_parse():
             # 미션 파싱
@@ -137,11 +151,21 @@ jobs:
         import sys
         import json
         import asyncio
+        import os
         from pathlib import Path
-        sys.path.append('ai-workflow/src/workflow')
         
-        from new_agent_system import NewAgentSystem
-        from repository_connector import ClassicIsekaiConnector
+        # 경로 설정
+        workflow_path = os.path.join('ai-workflow', 'src', 'workflow')
+        sys.path.insert(0, workflow_path)
+        print(f"Python path added: {workflow_path}")
+        
+        try:
+            from new_agent_system import NewAgentSystem
+            from repository_connector import ClassicIsekaiConnector
+            print("✅ 개선 모듈 import 성공")
+        except ImportError as e:
+            print(f"❌ Import 실패: {e}")
+            sys.exit(1)
         
         async def improve_episodes():
             # 설정 로드
