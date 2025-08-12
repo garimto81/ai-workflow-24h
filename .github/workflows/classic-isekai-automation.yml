@@ -153,6 +153,8 @@ jobs:
       env:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
+        # logs 디렉토리 생성
+        mkdir -p logs
         cat > improve_episodes.py << 'EOF'
         import sys
         import json

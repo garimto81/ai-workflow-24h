@@ -5,10 +5,14 @@
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
 from agents.main_coordinator import MainCoordinatorAgent
+
+# logs 디렉토리 생성
+os.makedirs('logs', exist_ok=True)
 
 # 로깅 설정
 logging.basicConfig(
