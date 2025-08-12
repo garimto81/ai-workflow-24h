@@ -1,0 +1,15 @@
+run = "cd src/workflow && python new_agent_system.py 1,2,3 9.0"
+language = "python3"
+
+[env]
+ANTHROPIC_API_KEY = ""  # Replit Secrets에서 설정
+
+[packager]
+language = "python3"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+
+[debugger]
+support = true

@@ -1,0 +1,53 @@
+name: Webnovel Automation 24/7
+
+on:
+  schedule:
+    # 매 6시간마다 실행 (GitHub Actions 제한 때문에)
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # 수동 실행 가능
+    inputs:
+      episodes:
+        description: 'Episodes to improve (e.g., 1,2,3)'
+        required: true
+        default: '1,2,3'
+      target_score:
+        description: 'Target score (e.g., 9.5)'
+        required: true
+        default: '9.0'
+
+jobs:
+  improve-webnovel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350  # 5시간 50분 제한
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/workflow/requirements.txt
+    
+    - name: Set up environment
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> $GITHUB_ENV
+    
+    - name: Run Webnovel Automation
+      run: |
+        cd src/workflow
+        python new_agent_system.py ${{ github.event.inputs.episodes || '1,2,3' }} ${{ github.event.inputs.target_score || '9.0' }}
+    
+    - name: Commit improvements
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --staged --quiet || git commit -m "Auto: Webnovel improvements - $(date +'%Y-%m-%d %H:%M:%S')"
+        git push

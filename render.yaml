@@ -1,0 +1,11 @@
+services:
+  - type: worker
+    name: webnovel-automation
+    env: python
+    buildCommand: pip install -r src/workflow/requirements.txt
+    startCommand: cd src/workflow && python new_agent_system.py 1,2,3 9.0
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Render 대시보드에서 설정
+    autoDeploy: true
+    plan: free  # 무료 플랜 (월 750시간)
