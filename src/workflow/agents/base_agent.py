@@ -102,9 +102,26 @@ class BaseAgent(ABC):
         
         if api_key:
             try:
-                # Anthropic 클라이언트 초기화 (간단한 방식)
-                self.api_client = Anthropic(api_key=api_key)
+                # Anthropic 클라이언트 초기화 (최소 매개변수만 사용)
+                self.api_client = Anthropic(
+                    api_key=api_key,
+                    # proxies 등 다른 매개변수 제거
+                )
                 logger.info("Anthropic API 클라이언트 초기화 성공")
+            except TypeError as e:
+                if 'proxies' in str(e):
+                    logger.warning(f"proxies 매개변수 문제 - 더 간단한 방식으로 재시도")
+                    try:
+                        # 더 간단한 방식으로 재시도
+                        import anthropic
+                        self.api_client = anthropic.Anthropic(api_key=api_key)
+                        logger.info("Anthropic API 클라이언트 초기화 성공 (재시도)")
+                    except Exception as e2:
+                        logger.error(f"Anthropic API 재시도도 실패: {e2}")
+                        self.api_client = None
+                else:
+                    logger.error(f"Anthropic API 초기화 실패: {e}")
+                    self.api_client = None
             except Exception as e:
                 logger.error(f"Anthropic API 초기화 실패: {e}")
                 self.api_client = None

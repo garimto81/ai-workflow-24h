@@ -293,6 +293,9 @@ def get_project_loader(config_path=None):
     """프로젝트 로더 싱글톤 인스턴스를 반환 (지연 초기화)"""
     global _project_loader
     if _project_loader is None:
+        # config_path가 None이면 기본값 사용
+        if config_path is None:
+            config_path = 'config/classic_isekai_project.yaml'
         _project_loader = ProjectDocumentLoader(config_path)
     return _project_loader
 
